@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 . ./wvtest-bup.sh || exit $?
 . t/lib.sh || exit $?
 
@@ -295,3 +296,5 @@ WVPASSEQ "$(bup-ls -l src/latest/bad-symlink | tr -s ' ' ' ')" \
 
 
 WVPASS rm -rf "$tmpdir"
+
+WVFINISH

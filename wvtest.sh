@@ -1,161 +1,187 @@
-#
-# Include this file in your shell script by using:
-#         #!/bin/sh
-#         . ./wvtest.sh
-#
 
-# we don't quote $TEXT in case it contains newlines; newlines
+if [ -z "$BASH_VERSION" ]; then
+    echo "Depends on bash" 1>&2
+    exit 2
+fi
+
+_wvtop="$(pwd)"
+
+wvmktempdir ()
+{
+    local script_name="$(basename $0)"
+    mkdir -p "$_wvtop/t/tmp" || exit $?
+    mktemp -d "$_wvtop/t/tmp/$script_name-XXXXXXX" || exit $?
+}
+
+wvmkmountpt ()
+{
+    local script_name="$(basename $0)"
+    mkdir -p "$_wvtop/t/mnt" || exit $?
+    mktemp -d "$_wvtop/t/mnt/$script_name-XXXXXXX" || exit $?
+}
+
+_wvtest_count=0
+
+_wvtapmsg ()
+{
+    echo "$@" 1>&2
+}
+
+_wvinfo ()
+{
+    echo "$@" 1>&2
+}
+
+_wvdiag ()
+{
+    echo "# $@" | tr '\n' ' '
+    echo
+}
+
+# we don't quote $text in case it contains newlines; newlines
 # aren't allowed in test output.  However, we set -f so that
 # at least shell glob characters aren't processed.
 _wvtextclean()
 {
-	( set -f; echo $* )
+    ( set -f; echo $* )
 }
 
+declare -a _wvbtstack
 
-if [ -n "$BASH_VERSION" ]; then
-	. ./wvtest-bash.sh  # This keeps sh from choking on the syntax.
-else
-	_wvbacktrace() { true; }
-	_wvpushcall() { true; }
-	_wvpopcall() { true; }
-
-	_wvfind_caller()
-	{
-		WVCALLER_FILE="unknown"
-		WVCALLER_LINE=0
-	}
-fi
-
-
-_wvcheck()
+_wvpushcall()
 {
-	local CODE="$1"
-	local TEXT=$(_wvtextclean "$2")
-	local OK=ok
-	if [ "$CODE" -ne 0 ]; then
-		OK=FAILED
+    _wvbtstack[${#_wvbtstack[@]}]="$*"
+}
+
+_wvpopcall()
+{
+    unset _wvbtstack[$((${#_wvbtstack[@]} - 1))]
+}
+
+_wvbacktrace()
+{
+    local i loc
+    local call=$((${#_wvbtstack[@]} - 1))
+    for ((i=0; i <= ${#FUNCNAME[@]}; i++)); do
+	local name="${FUNCNAME[$i]}"
+	if test "${name:0:2}" == WV; then
+            loc="${BASH_SOURCE[$i+1]}:${BASH_LINENO[$i]}"
+	    echo "called from $loc ${FUNCNAME[$i]} ${_wvbtstack[$call]}" 1>&2
+	    ((call--))
 	fi
-	echo "! $WVCALLER_FILE:$WVCALLER_LINE  $TEXT  $OK" >&2
-	if [ "$CODE" -ne 0 ]; then
-		_wvbacktrace
-		exit $CODE
-	else
-		return 0
-	fi
+    done
 }
 
-
-WVPASS()
+_wvfind_caller()
 {
-	local TEXT="$*"
-	_wvpushcall "$@"
-
-	_wvfind_caller
-	if "$@"; then
-		_wvpopcall
-		_wvcheck 0 "$TEXT"
-		return 0
-	else
-		_wvcheck 1 "$TEXT"
-		# NOTREACHED
-		return 1
-	fi
+    wvcaller_file=${BASH_SOURCE[2]}
+    wvcaller_line=${BASH_LINENO[1]}
 }
 
-
-WVFAIL()
+_wvreport()
 {
-	local TEXT="$*"
-	_wvpushcall "$@"
-
-	_wvfind_caller
-	if "$@"; then
-		_wvcheck 1 "NOT($TEXT)"
-		# NOTREACHED
-		return 1
-	else
-		_wvcheck 0 "NOT($TEXT)"
-		_wvpopcall
-		return 0
-	fi
-}
-
-
-_wvgetrv()
-{
-	( "$@" >&2 )
-	echo -n $?
-}
-
-
-WVPASSEQ()
-{
-	_wvpushcall "$@"
-	_wvfind_caller
-	_wvcheck $(_wvgetrv [ "$#" -eq 2 ]) "exactly 2 arguments"
-	echo "Comparing:" >&2
-	echo "$1" >&2
-	echo "--" >&2
-	echo "$2" >&2
-	_wvcheck $(_wvgetrv [ "$1" = "$2" ]) "'$1' = '$2'"
-	_wvpopcall
-}
-
-
-WVPASSNE()
-{
-	_wvpushcall "$@"
-	_wvfind_caller
-	_wvcheck $(_wvgetrv [ "$#" -eq 2 ]) "exactly 2 arguments"
-	echo "Comparing:" >&2
-	echo "$1" >&2
-	echo "--" >&2
-	echo "$2" >&2
-	_wvcheck $(_wvgetrv [ "$1" != "$2" ]) "'$1' != '$2'"
-	_wvpopcall
-}
-
-
-WVPASSRC()
-{
-	local RC=$?
-	_wvpushcall "$@"
-	_wvfind_caller
-	_wvcheck $(_wvgetrv [ $RC -eq 0 ]) "return code($RC) == 0"
-	_wvpopcall
-}
-
-
-WVFAILRC()
-{
-	local RC=$?
-	_wvpushcall "$@"
-	_wvfind_caller
-	_wvcheck $(_wvgetrv [ $RC -ne 0 ]) "return code($RC) != 0"
-	_wvpopcall
+    local rc="$1"
+    local text=$(_wvtextclean "$2")
+    ((_wvtest_count++)) || true
+    if test "$rc" -eq 0; then
+        _wvtapmsg "ok $_wvtest_count $wvcaller_file:$wvcaller_line($rc) $text"
+    else
+        _wvtapmsg "not ok $_wvtest_count $wvcaller_file:$wvcaller_line($rc) $text"
+	_wvbacktrace
+    fi
 }
 
 
 WVSTART()
 {
-	echo >&2
-	_wvfind_caller
-	echo "Testing \"$*\" in $WVCALLER_FILE:" >&2
+    _wvfind_caller
+    _wvdiag "$wvcaller_file: $*"
 }
 
+# FIXME: maybe factor out common code, via some more stack elision
+
+WVPASS()
+{
+    local test_txt="$*"
+    _wvpushcall "$@"
+    _wvfind_caller
+    if "$@"; then
+	_wvpopcall
+        _wvreport 0 "$test_txt"
+    else
+        local rc="$?"
+        _wvreport "$rc" "$test_txt"
+        exit "$rc"
+    fi
+}
+
+# FIXME: share with WVPASS?
+
+WVFAIL()
+{
+    local test_txt="$*"
+    _wvpushcall "$@"
+    _wvfind_caller
+    if ! "$@"; then
+	_wvpopcall
+        _wvreport 0 "$test_txt"
+    else
+        local rc="$?"
+        _wvreport "$rc"
+        exit "$rc"
+    fi
+}
+
+WVPASSEQ()
+{
+    _wvpushcall "$@"
+    _wvfind_caller
+    if test "$#" -ne 2; then
+        _wvreport 2 "exactly 2 arguments"
+        exit 2
+    fi
+    _wvinfo "Comparing:"
+    _wvinfo "$1"
+    _wvinfo "--"
+    _wvinfo "$2"
+    if test "$1" = "$2"; then
+        _wvreport 0 "$(printf "%q = %q" "$1" "$2")"
+    else
+        _wvreport 1 "$(printf "%q = %q" "$1" "$2")"
+    fi
+    _wvpopcall
+}
+
+WVPASSNE()
+{
+    _wvpushcall "$@"
+    _wvfind_caller
+    if test "$#" -ne 2; then
+        _wvreport 2 "exactly 2 arguments"
+        exit 2
+    fi
+    _wvinfo "Comparing:"
+    _wvinfo "$1"
+    _wvinfo "--"
+    _wvinfo "$2"
+    if test ! "$1" = "$2"; then
+        _wvreport 0 "$(printf "%q = %q" "$1" "$2")"
+    else
+        _wvreport 1 "$(printf "%q = %q" "$1" "$2")"
+    fi
+    _wvpopcall
+}
 
 WVDIE()
 {
-	local TEXT=$(_wvtextclean "$@")
-	_wvpushcall "$@"
-	_wvfind_caller
-	echo "! $WVCALLER_FILE:$WVCALLER_LINE  $TEXT  FAILED" 1>&2
-	exit 1
+    local text=$(_wvtextclean "$@")
+    _wvpushcall "$@"
+    _wvfind_caller
+    _wvdiag "$wvcaller_file:$wvcaller_line $text"
+    exit 2
 }
 
-
-# Local Variables:
-# indent-tabs-mode: t
-# sh-basic-offset: 8
-# End:
+WVFINISH ()
+{
+    _wvtapmsg "1..$_wvtest_count"
+}

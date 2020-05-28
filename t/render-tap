@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+
+from __future__ import absolute_import, print_function
+
+import re, sys
+
+ok = nok = todo_ok = skip = 0
+set_ok = set_nok = set_todo_ok = set_skip = 0
+set_name = None
+expected = None
+
+# Judging from the standard, "ok5go" might be a valid test 5.
+
+plan_rx = re.compile(r'^\s*1..(\d)+\s*$')
+result_rx = re.compile(r'^(not )?ok\b\s*([0-9]+)?(.*)(#.*)?')
+todo_rx = re.compile(r'(?i)# todo (.*)')
+skip_rx = re.compile(r'(?i)# skip\S*\s+(.*)')
+
+for line in sys.stdin:
+    if line.startswith('# Begin TAP set: '):
+        if expected is None and set_name is not None:
+            print('# no test plan found for', set_name)
+        print(line, end='')
+        set_name = set_name[len('# Begin TAP set: '):]
+        set_ok = set_nok = set_todo_ok = set_skip = 0
+        expected = None
+        continue
+    if line.startswith('#'):
+        print(line, end='')
+        continue
+    m = plan_rx.match(line)
+    if m:
+        if expected is not None:
+            print('# error: ignoring redundant plan', line, end='')
+        else:
+            expected = m.group(1)
+        continue
+    m = result_rx.match(line)
+    if m:
+        failed, num, msg, directive = m.groups()
+        if directive:
+            m = todo_rx.match(directive)
+            if m:
+                if yep:
+                    todo_ok += 1
+            elif not skip_rx.match(directive):
+                print('# error: ignoring unknown directive', line, end='')
+                continue
+            print(line, end='')
+            continue
+        if failed:
+            nok += 1
+        else:
+            ok += 1
+        #print(line, end='')
+
+print('%d failures, %d successes (%d unexpected)'
+      % (nok, ok, todo_ok))
+sys.exit(2 if nok else 0)

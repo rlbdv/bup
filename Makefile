@@ -247,6 +247,11 @@ test: all
 	  $(MAKE) runtests 2>t/tmp/test-log/$$$$.log
 	./wvtest report t/tmp/test-log/*.log
 
+tap-tests: all
+	if test -e t/tmp/test-log; then rm -r t/tmp/test-log; fi
+	mkdir -p t/tmp/test-log
+	time $(MAKE) -O runtests-cmdline | t/render-tap
+
 check: test
 
 distcheck: all
