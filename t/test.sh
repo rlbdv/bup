@@ -27,6 +27,12 @@ WVPASS touch $D/d/z
 WVPASS bup index $D
 WVPASS bup save -t $D
 
+WVPASS test ! -e somerepo
+WVPASS bup init somerepo
+WVPASS test -d somerepo
+WVPASS bup -d somerepo ls
+WVPASS rm -rf somerepo
+
 
 WVSTART "bloom"
 WVPASS bup bloom -c $(ls -1 "$BUP_DIR"/objects/pack/*.idx|head -n1)
