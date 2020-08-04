@@ -1,13 +1,17 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import
 import sys, os, stat, time, random, subprocess, glob
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 from bup import client, git, path
 from bup.compat import bytes_from_uint, environ, range
 from bup.helpers import mkdirp
-from buptest import no_lingering_errors, test_tempdir
+from buptest import no_lingering_errors
+import buptest
 
 
 def randbytes(sz):
@@ -24,10 +28,9 @@ s3 = randbytes(10000)
 IDX_PAT = b'/*.idx'
     
 
-@wvtest
 def test_server_split_with_indexes():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tclient-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tclient-') as tmpdir:
             environ[b'BUP_DIR'] = bupdir = tmpdir
             git.init_repo(bupdir)
             lw = git.PackWriter()
@@ -43,10 +46,9 @@ def test_server_split_with_indexes():
             rw.close()
     
 
-@wvtest
 def test_multiple_suggestions():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tclient-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tclient-') as tmpdir:
             environ[b'BUP_DIR'] = bupdir = tmpdir
             git.init_repo(bupdir)
 
@@ -78,10 +80,9 @@ def test_multiple_suggestions():
             WVPASSEQ(len(glob.glob(c.cachedir+IDX_PAT)), 3)
 
 
-@wvtest
 def test_dumb_client_server():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tclient-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tclient-') as tmpdir:
             environ[b'BUP_DIR'] = bupdir = tmpdir
             git.init_repo(bupdir)
             open(git.repo(b'bup-dumb-server'), 'w').close()
@@ -100,10 +101,9 @@ def test_dumb_client_server():
             WVPASSEQ(len(glob.glob(c.cachedir+IDX_PAT)), 2)
 
 
-@wvtest
 def test_midx_refreshing():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tclient-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tclient-') as tmpdir:
             environ[b'BUP_DIR'] = bupdir = tmpdir
             git.init_repo(bupdir)
             c = client.Client(bupdir, create=True)
@@ -139,7 +139,6 @@ def test_midx_refreshing():
             WVPASSEQ(len(pi.packs), 1)
 
 
-@wvtest
 def test_remote_parsing():
     with no_lingering_errors():
         tests = (

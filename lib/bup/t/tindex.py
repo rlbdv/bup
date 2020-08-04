@@ -1,23 +1,25 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import, print_function
-import os, time
+import os, time, sys
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 from bup import index, metadata
 from bup.compat import fsencode
 from bup.helpers import mkdirp, resolve_parent
-from buptest import no_lingering_errors, test_tempdir
+from buptest import no_lingering_errors
 import bup.xstat as xstat
-
+import buptest
 
 lib_t_dir = os.path.dirname(fsencode(__file__))
 
 
-@wvtest
-def index_basic():
+def test_index_basic():
     with no_lingering_errors():
-        cd = os.path.realpath(b'../../../t')
+        cd = os.path.realpath(b't/')
         WVPASS(cd)
         sd = os.path.realpath(cd + b'/sampledata')
         WVPASSEQ(resolve_parent(cd + b'/sampledata'), sd)
@@ -28,10 +30,9 @@ def index_basic():
                  sd + b'/var/abs-symlink')
 
 
-@wvtest
-def index_writer():
+def test_index_writer():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tindex-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tindex-') as tmpdir:
             orig_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
@@ -67,10 +68,9 @@ def eget(l, ename):
         if e.name == ename:
             return e
 
-@wvtest
-def index_negative_timestamps():
+def test_index_negative_timestamps():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tindex-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tindex-') as tmpdir:
             # Makes 'foo' exist
             foopath = tmpdir + b'/foo'
             f = open(foopath, 'wb')
@@ -91,10 +91,9 @@ def index_negative_timestamps():
             WVPASS(e.packed())
 
 
-@wvtest
-def index_dirty():
+def test_index_dirty():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tindex-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tindex-') as tmpdir:
             orig_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)

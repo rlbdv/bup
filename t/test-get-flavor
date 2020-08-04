@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -e
+
+name="$(basename "$0")"
+
+if test "$(echo "$name" | cut -b -9)" != test-get-; then
+    echo "Command name does not begin with test-get-: " "$name" 2>&1
+    exit 2
+fi
+
+flavor="$(echo "$name" | cut -b 10-)"
+if test -z "$flavor"; then
+    echo "No test flavor after test-get- in command name: " "$name" 2>&1
+    exit 2
+fi
+
+exec t/test-get "$flavor"

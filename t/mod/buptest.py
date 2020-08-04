@@ -8,7 +8,7 @@ from subprocess import PIPE, Popen
 from traceback import extract_stack
 import errno, os, subprocess, sys, tempfile
 
-from wvtest import WVPASSEQ, wvfailure_count
+from wvtest import WVPASSEQ
 
 from bup import helpers
 from bup.compat import str_type
@@ -22,10 +22,7 @@ def no_lingering_errors():
             bt = extract_stack()
             src_file, src_line, src_func, src_txt = bt[-4]
             msg = 'saved_errors ' + repr(helpers.saved_errors)
-            print('! %-70s %s' % ('%s:%-4d %s' % (basename(src_file),
-                                                  src_line,
-                                                  msg),
-                                  'FAILED'))
+            print('not ok %s:%d %s' % (src_file, src_line, msg))
             sys.stdout.flush()
     fail_if_errors()
     helpers.clear_errors()
@@ -35,13 +32,16 @@ def no_lingering_errors():
 
 
 # Assumes (of course) this file is at the top-level of the source tree
-_bup_tmp = realpath(dirname(__file__.encode('iso-8859-1')) + b'/t/tmp')
+_bup_tmp = realpath(dirname(__file__.encode('iso-8859-1')) + b'/../tmp')
 try:
     os.makedirs(_bup_tmp)
 except OSError as e:
     if e.errno != errno.EEXIST:
         raise
 
+# FIXME
+def wvfailure_count():
+    return 1
 
 @contextmanager
 def test_tempdir(prefix):

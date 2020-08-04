@@ -19,10 +19,10 @@ from time import localtime, strftime, time
 import os, random, sys
 
 # For buptest, wvtest, ...
-sys.path[:0] = (abspath(os.path.dirname(__file__) + '/..'),)
+sys.path[:0] = (abspath(os.path.dirname(__file__) + '/mod'),)
 
 from buptest import ex, exo, test_tempdir
-from wvtest import wvfail, wvpass, wvpasseq, wvpassne, wvstart
+from wvtap import wvfail, wvpass, wvpasseq, wvpassne, wvstart
 
 from bup import compat
 from bup.compat import environ

@@ -1,8 +1,11 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import, print_function
-import errno, glob, grp, pwd, stat, tempfile, subprocess
+import errno, glob, os, grp, pwd, stat, tempfile, subprocess, sys
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 from bup import git, metadata
 from bup import vfs
@@ -10,13 +13,12 @@ from bup.compat import range
 from bup.helpers import clear_errors, detect_fakeroot, is_superuser, resolve_parent
 from bup.repo import LocalRepo
 from bup.xstat import utime, lutime
-from buptest import no_lingering_errors, test_tempdir
+from buptest import no_lingering_errors
 import bup.helpers as helpers
+import buptest
 
-
-top_dir = b'../../..'
 bup_tmp = os.path.realpath(b'../../../t/tmp')
-bup_path = top_dir + b'/bup'
+bup_path = b'./bup'
 start_dir = os.getcwd()
 
 
@@ -58,7 +60,6 @@ def cleanup_testfs():
     helpers.unlink(b'testfs.img')
 
 
-@wvtest
 def test_clean_up_archive_path():
     with no_lingering_errors():
         cleanup = metadata._clean_up_path_for_archive
@@ -81,7 +82,6 @@ def test_clean_up_archive_path():
         WVPASSEQ(cleanup(b''), b'.')
 
 
-@wvtest
 def test_risky_path():
     with no_lingering_errors():
         risky = metadata._risky_path
@@ -102,7 +102,6 @@ def test_risky_path():
         WVFAIL(risky(b'foo/./bar'))
 
 
-@wvtest
 def test_clean_up_extract_path():
     with no_lingering_errors():
         cleanup = metadata._clean_up_extract_path
@@ -127,10 +126,9 @@ def test_clean_up_extract_path():
         WVPASSEQ(cleanup(b'///foo/bar'), b'foo/bar')
 
 
-@wvtest
 def test_metadata_method():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tmetadata-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tmetadata-') as tmpdir:
             bup_dir = tmpdir + b'/bup'
             data_path = tmpdir + b'/foo'
             os.mkdir(data_path)
@@ -174,12 +172,11 @@ def _first_err():
     return ''
 
 
-@wvtest
 def test_from_path_error():
     if is_superuser() or detect_fakeroot():
         return
     with no_lingering_errors():
-        with test_tempdir(b'bup-tmetadata-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tmetadata-') as tmpdir:
             path = tmpdir + b'/foo'
             os.mkdir(path)
             m = metadata.from_path(path, archive_path=path, save_symlinks=True)
@@ -208,14 +205,13 @@ def _linux_attr_supported(path):
     return True
 
 
-@wvtest
 def test_apply_to_path_restricted_access():
     if is_superuser() or detect_fakeroot():
         return
     if sys.platform.startswith('cygwin'):
         return # chmod 000 isn't effective.
     with no_lingering_errors():
-        with test_tempdir(b'bup-tmetadata-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tmetadata-') as tmpdir:
             parent = tmpdir + b'/foo'
             path = parent + b'/bar'
             os.mkdir(parent)
@@ -237,10 +233,9 @@ def test_apply_to_path_restricted_access():
             clear_errors()
 
 
-@wvtest
 def test_restore_over_existing_target():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tmetadata-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tmetadata-') as tmpdir:
             path = tmpdir + b'/foo'
             os.mkdir(path)
             dir_m = metadata.from_path(path, archive_path=path, save_symlinks=True)
@@ -272,7 +267,7 @@ def test_restore_over_existing_target():
 
 from bup.metadata import posix1e
 if not posix1e:
-    @wvtest
+    # FIXME?
     def POSIX1E_ACL_SUPPORT_IS_MISSING():
         pass
 
@@ -283,7 +278,6 @@ if xattr:
         return list(filter(lambda i: not i in (b'security.selinux', ),
                            attrs))
 
-    @wvtest
     def test_handling_of_incorrect_existing_linux_xattrs():
         if not is_superuser() or detect_fakeroot():
             WVMSG('skipping test -- not superuser')

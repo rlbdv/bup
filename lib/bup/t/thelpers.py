@@ -1,25 +1,28 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import
 from time import tzset
-import helpers, math, os, os.path, re, subprocess
+import math, os, re, subprocess, sys
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
 
+from wvpytest import *
+
+from bup import helpers
 from bup.compat import bytes_from_byte, bytes_from_uint, environ
 from bup.helpers import (atomically_replaced_file, batchpipe, detect_fakeroot,
                          grafted_path_components, mkdirp, parse_num,
                          path_components, readpipe, stripped_path_components,
                          shstr,
                          utc_offset_str)
-from buptest import no_lingering_errors, test_tempdir
+from buptest import no_lingering_errors
 import bup._helpers as _helpers
-
+import buptest
 
 bup_tmp = os.path.realpath(b'../../../t/tmp')
 mkdirp(bup_tmp)
 
 
-@wvtest
 def test_parse_num():
     with no_lingering_errors():
         pn = parse_num
@@ -31,7 +34,6 @@ def test_parse_num():
         WVPASSEQ(pn('1e+9 k'), 1000000000 * 1024)
         WVPASSEQ(pn('-3e-3mb'), int(-0.003 * 1024 * 1024))
 
-@wvtest
 def test_detect_fakeroot():
     with no_lingering_errors():
         if b'FAKEROOTKEY' in environ:
@@ -39,7 +41,6 @@ def test_detect_fakeroot():
         else:
             WVPASS(not detect_fakeroot())
 
-@wvtest
 def test_path_components():
     with no_lingering_errors():
         WVPASSEQ(path_components(b'/'), [(b'', b'/')])
@@ -50,7 +51,6 @@ def test_path_components():
         WVEXCEPT(Exception, path_components, b'foo')
 
 
-@wvtest
 def test_stripped_path_components():
     with no_lingering_errors():
         WVPASSEQ(stripped_path_components(b'/', []), [(b'', b'/')])
@@ -71,7 +71,6 @@ def test_stripped_path_components():
         WVEXCEPT(Exception, stripped_path_components, b'foo', [])
 
 
-@wvtest
 def test_grafted_path_components():
     with no_lingering_errors():
         WVPASSEQ(grafted_path_components([(b'/chroot', b'/')], b'/foo'),
@@ -103,7 +102,6 @@ def test_grafted_path_components():
         WVEXCEPT(Exception, grafted_path_components, b'foo', [])
 
 
-@wvtest
 def test_shstr():
     with no_lingering_errors():
         # Do nothing for strings and bytes
@@ -125,7 +123,6 @@ def test_shstr():
         WVPASSEQ(shstr(("'1", '3')), "''\"'\"'1' 3")
 
 
-@wvtest
 def test_readpipe():
     with no_lingering_errors():
         x = readpipe([b'echo', b'42'])
@@ -138,7 +135,6 @@ def test_readpipe():
                 WVPASSEQ(str(ex), rx)
 
 
-@wvtest
 def test_batchpipe():
     with no_lingering_errors():
         for chunk in batchpipe([b'echo'], []):
@@ -167,10 +163,9 @@ def test_batchpipe():
         WVPASSEQ(next(batches, None), None)
 
 
-@wvtest
 def test_atomically_replaced_file():
     with no_lingering_errors():
-        with test_tempdir(b'bup-thelper-') as tmpdir:
+        with buptest.test_tempdir(b'bup-thelper-') as tmpdir:
             target_file = os.path.join(tmpdir, b'test-atomic-write')
 
             with atomically_replaced_file(target_file, mode='w') as f:
@@ -201,7 +196,6 @@ def set_tz(tz):
     tzset()
 
 
-@wvtest
 def test_utc_offset_str():
     with no_lingering_errors():
         tz = environ.get(b'TZ')
@@ -232,7 +226,6 @@ def test_utc_offset_str():
                 except KeyError:
                     pass
 
-@wvtest
 def test_valid_save_name():
     with no_lingering_errors():
         valid = helpers.valid_save_name

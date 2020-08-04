@@ -1,16 +1,19 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import, print_function
 from binascii import hexlify, unhexlify
 from subprocess import check_call
-import struct, os, time
+import struct, os, sys, time
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 from bup import git, path
 from bup.compat import bytes_from_byte, environ, range
 from bup.helpers import localtime, log, mkdirp, readpipe
-from buptest import no_lingering_errors, test_tempdir
-
+from buptest import no_lingering_errors
+import buptest
 
 bup_exe = path.exe()
 
@@ -25,7 +28,6 @@ def exo(*cmd):
     return readpipe(cmd)
 
 
-@wvtest
 def test_git_version_detection():
     with no_lingering_errors():
         # Test version types from git's tag history
@@ -65,8 +67,7 @@ def test_git_version_detection():
                 git._git_great = None
 
 
-@wvtest
-def testmangle():
+def test_mangle():
     with no_lingering_errors():
         afile  = 0o100644
         afile2 = 0o100770
@@ -96,8 +97,7 @@ def testmangle():
         WVPASSEQ(git.demangle_name(b'f.bupa', afile), (b'f.bupa', git.BUP_NORMAL))
 
 
-@wvtest
-def testencode():
+def test_encode():
     with no_lingering_errors():
         s = b'hello world'
         looseb = b''.join(git._encode_looseobj(b'blob', s))
@@ -123,10 +123,9 @@ def testencode():
         WVEXCEPT(ValueError, encode_pobj, b'x')
 
 
-@wvtest
-def testpacks():
+def test_packs():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tgit-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tgit-') as tmpdir:
             environ[b'BUP_DIR'] = bupdir = tmpdir + b'/bup'
             git.init_repo(bupdir)
             git.verbose = 1
@@ -167,10 +166,9 @@ def testpacks():
             WVFAIL(r.exists(b'\0'*20))
 
 
-@wvtest
 def test_pack_name_lookup():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tgit-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tgit-') as tmpdir:
             environ[b'BUP_DIR'] = bupdir = tmpdir + b'/bup'
             git.init_repo(bupdir)
             git.verbose = 1
@@ -193,10 +191,9 @@ def test_pack_name_lookup():
                     WVPASSEQ(idxname, r.exists(hashes[i], want_source=True))
 
 
-@wvtest
 def test_long_index():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tgit-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tgit-') as tmpdir:
             environ[b'BUP_DIR'] = bupdir = tmpdir + b'/bup'
             git.init_repo(bupdir)
             idx = git.PackIdxV2Writer()
@@ -219,10 +216,9 @@ def test_long_index():
             WVPASSEQ(i.find_offset(obj3_bin), 0xff)
 
 
-@wvtest
 def test_check_repo_or_die():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tgit-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tgit-') as tmpdir:
             environ[b'BUP_DIR'] = bupdir = tmpdir + b'/bup'
             orig_cwd = os.getcwd()
             try:
@@ -255,7 +251,6 @@ def test_check_repo_or_die():
                 os.chdir(orig_cwd)
 
 
-@wvtest
 def test_commit_parsing():
 
     def restore_env_var(name, val):
@@ -269,7 +264,7 @@ def test_commit_parsing():
                          b'--pretty=format:%s' % val, commit]).strip()
 
     with no_lingering_errors():
-        with test_tempdir(b'bup-tgit-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tgit-') as tmpdir:
             orig_cwd = os.getcwd()
             workdir = tmpdir + b'/work'
             repodir = workdir + b'/.git'
@@ -331,10 +326,9 @@ def test_commit_parsing():
                 restore_env_var(b'GIT_COMMITTER_EMAIL', orig_committer_email)
 
 
-@wvtest
 def test_new_commit():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tgit-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tgit-') as tmpdir:
             environ[b'BUP_DIR'] = bupdir = tmpdir + b'/bup'
             git.init_repo(bupdir)
             git.verbose = 1
@@ -394,10 +388,9 @@ def test_new_commit():
             WVPASSEQ(cdate_tz_sec, commit_items.committer_offset)
 
 
-@wvtest
 def test_list_refs():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tgit-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tgit-') as tmpdir:
             environ[b'BUP_DIR'] = bupdir = tmpdir + b'/bup'
             src = tmpdir + b'/src'
             mkdirp(src)
@@ -446,7 +439,6 @@ def test_list_refs():
             WVPASSEQ(frozenset(git.list_refs(limit_to_tags=True)), expected_tags)
 
 
-@wvtest
 def test__git_date_str():
     with no_lingering_errors():
         WVPASSEQ(b'0 +0000', git._git_date_str(0, 0))
@@ -454,10 +446,9 @@ def test__git_date_str():
         WVPASSEQ(b'0 +0130', git._git_date_str(0, 90 * 60))
 
 
-@wvtest
 def test_cat_pipe():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tgit-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tgit-') as tmpdir:
             environ[b'BUP_DIR'] = bupdir = tmpdir + b'/bup'
             src = tmpdir + b'/src'
             mkdirp(src)
@@ -488,7 +479,6 @@ def _create_idx(d, i):
     packname = os.path.join(d, b'pack-%s.idx' % hexlify(packbin))
     idx.write(packname, packbin)
 
-@wvtest
 def test_midx_close():
     fddir = b'/proc/self/fd'
     try:
@@ -509,7 +499,7 @@ def test_midx_close():
         check_call(args)
 
     with no_lingering_errors(), \
-         test_tempdir(b'bup-tgit-') as tmpdir:
+         buptest.test_tempdir(b'bup-tgit-') as tmpdir:
         environ[b'BUP_DIR'] = bupdir = tmpdir + b'/bup'
         git.init_repo(bupdir)
         # create a few dummy idxes

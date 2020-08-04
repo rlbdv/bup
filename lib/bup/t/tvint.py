@@ -1,8 +1,12 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import
 from io import BytesIO
+import os, sys
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 from bup import vint
 from buptest import no_lingering_errors
@@ -14,7 +18,6 @@ def encode_and_decode_vuint(x):
     return vint.read_vuint(BytesIO(f.getvalue()))
 
 
-@wvtest
 def test_vuint():
     with no_lingering_errors():
         for x in (0, 1, 42, 128, 10**16):
@@ -29,7 +32,6 @@ def encode_and_decode_vint(x):
     return vint.read_vint(BytesIO(f.getvalue()))
 
 
-@wvtest
 def test_vint():
     with no_lingering_errors():
         values = (0, 1, 42, 64, 10**16)
@@ -47,7 +49,6 @@ def encode_and_decode_bvec(x):
     return vint.read_bvec(BytesIO(f.getvalue()))
 
 
-@wvtest
 def test_bvec():
     with no_lingering_errors():
         values = (b'', b'x', b'foo', b'\0', b'\0foo', b'foo\0bar\0')
@@ -69,7 +70,6 @@ def pack_and_unpack(types, *values):
     return vint.unpack(types, data)
 
 
-@wvtest
 def test_pack_and_unpack():
     with no_lingering_errors():
         tests = [('', []),

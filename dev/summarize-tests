@@ -1,0 +1,36 @@
+#!/usr/bin/env python
+
+from __future__ import absolute_import
+from argparse import ArgumentParser
+from sys import stdout
+import json, os, sys
+
+parser = ArgumentParser()
+parser.add_argument('summary', metavar='SUMMARY', nargs='*')
+opts = parser.parse_args()
+
+rc = 0
+summaries = []
+
+for summary in opts.summary:
+    with open(summary, 'rb') as f:
+        summaries.append(json.load(f))
+
+failure_logs = []
+nok = ok = todo_ok = bails = 0
+for summary in summaries:
+    if summary['not_ok'] or summary['bail_out'] or summary['exit']:
+        failure_logs.append(summary['log'])
+        rc = 2
+    bails += summary['bail_out']
+    ok += summary['ok']
+    nok += summary['not_ok']
+    todo_ok += summary['todo_ok']
+stdout.write('Tests: %d not ok, %d ok (%d unexpected), bail outs %d\n'
+             % (nok, ok, todo_ok, bails))
+if failure_logs:
+    stdout.write('Failures:\n')
+    for log in failure_logs:
+        stdout.write('  ' + log + '\n')
+
+exit(rc)

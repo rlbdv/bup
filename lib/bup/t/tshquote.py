@@ -1,16 +1,18 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import
+import os, sys
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 from bup import shquote
 from buptest import no_lingering_errors
 
-
 def qst(line):
     return [word for offset,word in shquote.quotesplit(line)]
 
-@wvtest
 def test_shquote():
     with no_lingering_errors():
         WVPASSEQ(qst("""  this is    basic \t\n\r text  """),

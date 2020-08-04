@@ -1,13 +1,16 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import
+import os, sys
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 from bup import options
 from buptest import no_lingering_errors
 
 
-@wvtest
 def test_optdict():
     with no_lingering_errors():
         d = options.OptDict({
@@ -50,7 +53,6 @@ x,y
 """
 
 
-@wvtest
 def test_invalid_optspec():
     with no_lingering_errors():
         WVPASS(options.Options(invalid_optspec0).parse([]))
@@ -78,7 +80,6 @@ x,extended,no-simple   extended mode [2]
 #,compress=  set compression level [5]
 """
 
-@wvtest
 def test_options():
     with no_lingering_errors():
         o = options.Options(optspec)

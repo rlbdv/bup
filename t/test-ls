@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
+
 . ./wvtest-bup.sh || exit $?
 . t/lib.sh || exit $?
 
 set -o pipefail
+
+trap WVFINISH EXIT
 
 top="$(WVPASS pwd)" || exit $?
 tmpdir="$(WVPASS wvmktempdir)" || exit $?

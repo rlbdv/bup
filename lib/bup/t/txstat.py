@@ -1,15 +1,18 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import
-import math, tempfile, subprocess
+import math, os, subprocess, sys, tempfile, unittest
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 import bup._helpers as _helpers
+import buptest
 from bup import xstat
-from buptest import no_lingering_errors, test_tempdir
+from buptest import no_lingering_errors
 
 
-@wvtest
 def test_fstime():
     with no_lingering_errors():
         WVPASSEQ(xstat.timespec_to_nsecs((0, 0)), 0)
@@ -60,12 +63,11 @@ def test_fstime():
         WVPASSEQ(type(xstat.fstime_floor_secs(-10**9 / 2)), type(0))
 
 
-@wvtest
 def test_bup_utimensat():
     if not xstat._bup_utimensat:
         return
     with no_lingering_errors():
-        with test_tempdir(b'bup-txstat-') as tmpdir:
+        with buptest.test_tempdir(b'bup-txstat-') as tmpdir:
             path = tmpdir + b'/foo'
             open(path, 'w').close()
             frac_ts = (0, 10**9 // 2)
@@ -79,12 +81,11 @@ def test_bup_utimensat():
             WVPASS(mtime_ts[1] == 0 or mtime_ts[1] == frac_ts[1])
 
 
-@wvtest
 def test_bup_utimes():
     if not xstat._bup_utimes:
         return
     with no_lingering_errors():
-        with test_tempdir(b'bup-txstat-') as tmpdir:
+        with buptest.test_tempdir(b'bup-txstat-') as tmpdir:
             path = tmpdir + b'/foo'
             open(path, 'w').close()
             frac_ts = (0, 10**6 // 2)
@@ -98,12 +99,11 @@ def test_bup_utimes():
             WVPASS(mtime_ts[1] == 0 or mtime_ts[1] == frac_ts[1] * 1000)
 
 
-@wvtest
 def test_bup_lutimes():
     if not xstat._bup_lutimes:
         return
     with no_lingering_errors():
-        with test_tempdir(b'bup-txstat-') as tmpdir:
+        with buptest.test_tempdir(b'bup-txstat-') as tmpdir:
             path = tmpdir + b'/foo'
             open(path, 'w').close()
             frac_ts = (0, 10**6 // 2)

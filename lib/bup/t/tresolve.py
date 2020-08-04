@@ -1,3 +1,4 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import, print_function
 from binascii import unhexlify
@@ -6,8 +7,11 @@ from os import symlink
 from stat import S_IFDIR
 from sys import stderr
 from time import localtime, strftime
+import os, sys
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 from bup import git, path, vfs
 from bup.compat import environ
@@ -15,7 +19,9 @@ from bup.io import path_msg
 from bup.metadata import Metadata
 from bup.repo import LocalRepo, RemoteRepo
 from bup.test.vfs import tree_dict
-from buptest import ex, exo, no_lingering_errors, test_tempdir
+from buptest import ex, exo, no_lingering_errors
+import buptest
+
 
 bup_path = path.exe()
 
@@ -27,7 +33,7 @@ bup_path = path.exe()
 
 def prep_and_test_repo(name, create_repo, test_repo):
     with no_lingering_errors():
-        with test_tempdir(b'bup-t' + name) as tmpdir:
+        with buptest.test_tempdir(b'bup-t' + name) as tmpdir:
             bup_dir = tmpdir + b'/bup'
             environ[b'GIT_DIR'] = bup_dir
             environ[b'BUP_DIR'] = bup_dir
@@ -39,7 +45,7 @@ def prep_and_test_repo(name, create_repo, test_repo):
 # Currently, we just test through the repos since LocalRepo resolve is
 # just a straight redirection to vfs.resolve.
 
-def test_resolve(repo, tmpdir):
+def run_resolve_tests(repo, tmpdir):
         data_path = tmpdir + b'/src'
         resolve = repo.resolve
         save_time = 100000
@@ -293,17 +299,15 @@ def test_resolve(repo, tmpdir):
         wvpasseq(4, len(res))
         wvpasseq(expected, res)
 
-@wvtest
 def test_local_resolve():
     prep_and_test_repo(b'local-vfs-resolve',
-                       lambda x: LocalRepo(repo_dir=x), test_resolve)
+                       lambda x: LocalRepo(repo_dir=x), run_resolve_tests)
 
-@wvtest
 def test_remote_resolve():
     prep_and_test_repo(b'remote-vfs-resolve',
-                       lambda x: RemoteRepo(x), test_resolve)
+                       lambda x: RemoteRepo(x), run_resolve_tests)
 
-def test_resolve_loop(repo, tmpdir):
+def run_resolve_loop_tests(repo, tmpdir):
     data_path = tmpdir + b'/src'
     os.mkdir(data_path)
     symlink(b'loop', data_path + b'/loop')
@@ -321,14 +325,12 @@ def test_resolve_loop(repo, tmpdir):
         wvpasseq([b'', b'test', save_name, b'loop'],
                  [name for name, item in res_ex.terminus])
 
-@wvtest
 def test_local_resolve_loop():
     prep_and_test_repo(b'local-vfs-resolve-loop',
-                       lambda x: LocalRepo(x), test_resolve_loop)
+                       lambda x: LocalRepo(x), run_resolve_loop_tests)
 
-@wvtest
 def test_remote_resolve_loop():
     prep_and_test_repo(b'remote-vfs-resolve-loop',
-                       lambda x: RemoteRepo(x), test_resolve_loop)
+                       lambda x: RemoteRepo(x), run_resolve_loop_tests)
 
 # FIXME: add tests for the want_meta=False cases.

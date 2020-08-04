@@ -11,12 +11,16 @@ from os.path import abspath, dirname
 from random import randint
 from subprocess import check_output
 from sys import stderr, stdout
-import sys
+import os, sys
 
-script_home = abspath(dirname(sys.argv[0] or '.'))
-sys.path[:0] = [abspath(script_home + '/../lib'), abspath(script_home + '/..')]
+# For buptest, wvtest, ...
+sys.path[:0] = (abspath(os.path.dirname(__file__) + '/mod'),
+                abspath(os.path.dirname(__file__) + '/..'))
 
 from wvtest import wvcheck, wvfail, wvmsg, wvpass, wvpasseq, wvpassne, wvstart
+from wvtest import wvsection_begin, wvsection_end
+
+wvsection_begin('test ' + ' '.join(sys.argv))
 
 wvstart('command line arguments are not mangled')
 
@@ -27,3 +31,5 @@ for trial in range(100):
     cmd = [b't/echo-argv-bytes', rand_bytes(randint(1, 32))]
     out = check_output(cmd)
     wvpasseq(b'\0\n'.join(cmd) + b'\0\n', out)
+
+wvsection_end('test ' + ' '.join(sys.argv))

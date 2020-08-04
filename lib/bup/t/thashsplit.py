@@ -1,8 +1,12 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import
 from io import BytesIO
+import os, sys
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 from bup import hashsplit, _helpers, helpers
 from bup.compat import byte_int, bytes_from_uint
@@ -13,7 +17,6 @@ def nr_regions(x, max_count=None):
     return list(hashsplit._nonresident_page_regions(bytearray(x), 1, max_count))
 
 
-@wvtest
 def test_nonresident_page_regions():
     with no_lingering_errors():
         WVPASSEQ(nr_regions([]), [])
@@ -48,7 +51,6 @@ def test_nonresident_page_regions():
         WVPASSEQ(nr_regions([1, 0, 0, 0, 1], 4), [(1, 3)])
 
 
-@wvtest
 def test_uncache_ours_upto():
     history = []
     def mock_fadvise_pages_done(f, ofs, len):
@@ -85,12 +87,10 @@ def test_uncache_ours_upto():
             hashsplit._fadvise_pages_done = orig_pages_done
 
 
-@wvtest
 def test_rolling_sums():
     with no_lingering_errors():
         WVPASS(_helpers.selftest())
 
-@wvtest
 def test_fanout_behaviour():
 
     # Drop in replacement for bupsplit, but splitting if the int value of a

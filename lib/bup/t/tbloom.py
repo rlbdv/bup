@@ -1,18 +1,21 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import, print_function
-import errno, platform, tempfile
+import errno, os, platform, sys, tempfile
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 from bup import bloom
 from bup.helpers import mkdirp
-from buptest import no_lingering_errors, test_tempdir
+from buptest import no_lingering_errors
+import buptest
 
 
-@wvtest
 def test_bloom():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tbloom-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tbloom-') as tmpdir:
             hashes = [os.urandom(20) for i in range(100)]
             class Idx:
                 pass

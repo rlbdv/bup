@@ -141,8 +141,6 @@ lib/bup/_checkout.py:
 t/tmp:
 	mkdir t/tmp
 
-runtests: runtests-python runtests-cmdline
-
 python_tests := \
   lib/bup/t/tbloom.py \
   lib/bup/t/tclient.py \
@@ -158,31 +156,28 @@ python_tests := \
   lib/bup/t/tvint.py \
   lib/bup/t/txstat.py
 
-# The "pwd -P" here may not be appropriate in the long run, but we
-# need it until we settle the relevant drecurse/exclusion questions:
-# https://groups.google.com/forum/#!topic/bup-list/9ke-Mbp10Q0
-runtests-python: all t/tmp
-	mkdir -p t/tmp/test-log
-	$(pf); cd $$(pwd -P); TMPDIR="$(test_tmp)" \
-	  ./wvtest.py  $(python_tests) 2>&1 \
-	    | tee -a t/tmp/test-log/$$$$.log
-
-cmdline_tests := \
-  t/test.sh \
+standalone_tests := \
   t/test-argv \
   t/test-cat-file.sh \
   t/test-command-without-init-fails.sh \
   t/test-compression.sh \
   t/test-drecurse.sh \
   t/test-fsck.sh \
-  t/test-fuse.sh \
   t/test-ftp \
+  t/test-fuse.sh \
   t/test-gc.sh \
+  t/test-get-append \
+  t/test-get-ff \
+  t/test-get-new-tag \
+  t/test-get-pick \
+  t/test-get-replace \
+  t/test-get-universal \
+  t/test-get-unnamed \
   t/test-import-duplicity.sh \
   t/test-import-rdiff-backup.sh \
-  t/test-index.sh \
   t/test-index-check-device.sh \
   t/test-index-clear.sh \
+  t/test-index.sh \
   t/test-list-idx.sh \
   t/test-ls \
   t/test-ls-remote \
@@ -194,60 +189,59 @@ cmdline_tests := \
   t/test-redundant-saves.sh \
   t/test-restore-map-owner.sh \
   t/test-restore-single-file.sh \
-  t/test-rm.sh \
   t/test-rm-between-index-and-save.sh \
+  t/test-rm.sh \
   t/test-save-creates-no-unrefs.sh \
-  t/test-save-restore \
   t/test-save-errors \
+  t/test-save-restore \
   t/test-save-restore-excludes.sh \
   t/test-save-strip-graft.sh \
   t/test-save-with-valid-parent.sh \
   t/test-sparse-files.sh \
   t/test-split-join.sh \
   t/test-tz.sh \
-  t/test-xdev.sh
+  t/test-web.sh \
+  t/test-xdev.sh \
+  t/test.sh
 
-ifeq "2" "$(bup_python_majver)"
-  # unresolved
-  #   web: needs more careful attention, path bytes round-trips, reprs, etc.
-  cmdline_tests += \
-    t/test-web.sh
-endif
+# The "pwd -P" invocations below may not be appropriate in the long
+# run, but we need it until we settle the relevant drecurse/exclusion
+# questions: https://groups.google.com/forum/#!topic/bup-list/9ke-Mbp10Q0
 
-tmp-target-run-test-get-%: all t/tmp
-	$(pf); cd $$(pwd -P); TMPDIR="$(test_tmp)" \
-	  t/test-get $* 2>&1 | tee -a t/tmp/test-log/$$$$.log
+.PHONY: check-python
+check-python: $(python_tests)
+	$(pf); set -e; cd $$(pwd -P); \
+	export TMPDIR="$(test_tmp)"; \
+	test "$$BUP_TEST_LOGDIR" || export BUP_TEST_LOGDIR="$$(mktemp -d $(test_tmp)/log/XXXXXX)"; \
+	log_file="$$(mktemp "$$BUP_TEST_LOGDIR/python-XXXXXX.log")"; \
+	cmd/bup-python -m pytest $^ 2>&1 | tee "$$log_file"
 
-test_get_targets += \
-  tmp-target-run-test-get-replace \
-  tmp-target-run-test-get-universal \
-  tmp-target-run-test-get-ff \
-  tmp-target-run-test-get-append \
-  tmp-target-run-test-get-pick \
-  tmp-target-run-test-get-new-tag \
-  tmp-target-run-test-get-unnamed
+tmp-target-run-test/%: all t/tmp
+	$(pf); set -e; cd $$(pwd -P); \
+	export TMPDIR="$(test_tmp)"; \
+	test "$$BUP_TEST_LOGDIR" || export BUP_TEST_LOGDIR="$$(mktemp -d $(test_tmp)/log/XXXXXX)"; \
+	dev/monitor-test -d "$$BUP_TEST_LOGDIR" $*
 
-# For parallel runs.
-# The "pwd -P" here may not be appropriate in the long run, but we
-# need it until we settle the relevant drecurse/exclusion questions:
-# https://groups.google.com/forum/#!topic/bup-list/9ke-Mbp10Q0
-tmp-target-run-test%: all t/tmp
-	$(pf); cd $$(pwd -P); TMPDIR="$(test_tmp)" \
-	  t/test$* 2>&1 | tee -a t/tmp/test-log/$$$$.log
+standalone_test_tmp_targets := \
+  $(addprefix tmp-target-run-test/,$(standalone_tests))
 
-runtests-cmdline: $(test_get_targets) $(subst t/test,tmp-target-run-test,$(cmdline_tests))
+check-standalone: $(standalone_test_tmp_targets)
+
+check:
+	mkdir -p t/tmp/log
+	set -e; \
+	export BUP_TEST_LOGDIR="$$(mktemp -d $(test_tmp)/log/XXXXXX)"; \
+	echo "BUP_TEST_LOGDIR=$$BUP_TEST_LOGDIR"; \
+	make_rc=0; \
+	$(MAKE) -O check-python $(standalone_test_tmp_targets) || make_rc=$$?; \
+	echo -e "\nTest logs in $$BUP_TEST_LOGDIR"; \
+	dev/summarize-tests "$$BUP_TEST_LOGDIR/"*.json && exit "$$make_rc"
+
+test: check
 
 stupid:
 	PATH=/bin:/usr/bin $(MAKE) test
 
-test: all
-	if test -e t/tmp/test-log; then rm -r t/tmp/test-log; fi
-	mkdir -p t/tmp/test-log
-	./wvtest watch --no-counts \
-	  $(MAKE) runtests 2>t/tmp/test-log/$$$$.log
-	./wvtest report t/tmp/test-log/*.log
-
-check: test
 
 distcheck: all
 	./wvtest run t/test-release-archive.sh
@@ -319,7 +313,7 @@ import-docs: Documentation/clean
 clean: Documentation/clean cmd/bup-python
 	cd config && rm -f *~ .*~ \
 	  ${CONFIGURE_DETRITUS} ${CONFIGURE_FILES} ${GENERATED_FILES}
-	cd config && rm -rf config.var
+	rm -rf config/config.var lib/bup/t/__pycache__
 	rm -f *.o lib/*/*.o *.so lib/*/*.so *.dll lib/*/*.dll *.exe \
 		.*~ *~ */*~ lib/*/*~ lib/*/*/*~ \
 		*.pyc */*.pyc lib/*/*.pyc lib/*/*/*.pyc \

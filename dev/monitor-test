@@ -1,0 +1,167 @@
+#!/usr/bin/env python
+
+from __future__ import absolute_import, print_function
+from argparse import ArgumentParser
+from errno import ENOENT
+from os.path import basename
+from subprocess import PIPE, Popen, STDOUT
+from tempfile import mkstemp
+import json, os, re, shlex, sys
+
+if sys.version_info[0] >= 3:
+    def argv_bytes(x):
+        return os.fsencode(x)
+    def byte_stream(file):
+        return file.buffer
+else:
+    def argv_bytes(x):
+        return x
+    def byte_stream(file):
+        return file
+
+class TestStatus:
+    __slots__ = (
+        'bail_out',
+        'exit',
+        'expected',
+        'log',
+        'name',
+        'nok',
+        'ok',
+        'todo_ok')
+    def __init__(self, log, name):
+        self.bail_out = []
+        self.exit = None
+        self.expected = None
+        self.log = log
+        self.name = name
+        self.nok = self.ok = self.todo_ok = self.skip = 0
+    def __str__(self):
+        return str(self.__dict__)
+    def __repr__(self):
+        return repr(self.__dict__)
+
+plan_rx = re.compile(br'^\s*1..(\d)+\s*$')
+result_rx = re.compile(br'^(not )?ok\b\s*([0-9]+)?(.*)(#.*)?')
+todo_rx = re.compile(br'(?i)# todo (.*)')
+
+sys.stdout.flush()
+stdout = byte_stream(sys.stdout)
+
+def show(items, flush=True):
+    for item in items:
+        stdout.write(item)
+    if flush:
+        stdout.flush()
+
+def process_line(line, status, pending_output, log):
+    pending_output.append(line)
+    m = result_rx.match(line)
+    if m:
+        failed, num, result_msg, directive = m.groups()
+        num = int(num)
+        if directive:
+            m = todo_rx.match(directive)
+            if m:
+                status.todo_ok += 1
+            elif not skip_rx.match(directive):
+                show((b'# error: ignoring unknown directive' + line,))
+                return
+            del pending_output[:]
+            return
+        if failed:
+            status.nok += 1
+            show([b'\n'] + pending_output + [b'=========================\n\n'])
+        else:
+            status.ok += 1
+        del pending_output[:]
+        return
+    if line.startswith(b'#'):
+        show((line,))
+        return
+    # FIXME: do we care about bail outs?
+    if line.startswith(b'Bail Out!'): # Just advisory?
+        show((line,))
+        status.bail_out.append(line)
+        del pending_output[:]
+        return
+    m = plan_rx.match(line)
+    if m:
+        if status.expected is not None:
+            show(('# error: ignoring redundant plan ', line))
+        else:
+            status.expected = int(m.group(1))
+        return
+
+filename_quash_rx = re.compile(br'(?s)[^-a-zA-Z0-9_.]')
+
+# FIXME: test names might not be unique (though the log will be)
+
+def run_test(test, logdir):
+    global next_test_num
+    args = shlex.split(test)
+    fname = filename_quash_rx.sub(b'-', test)
+    fd, path = mkstemp(dir=logdir, prefix=fname + b'-', suffix=b'.log')
+    status = TestStatus(path, test)
+    pending_output = []
+    with os.fdopen(fd, 'wb') as log:
+        msg = b'# %s: starting\n' % basename(test)
+        log.write(msg)
+        show((msg,))
+        try:
+            p = Popen(args, close_fds=True, bufsize=65536,
+                      stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+        except OSError as ex:
+            if ex.errno != ENOENT:
+                raise
+            show(b'ERROR: test file does not exist: ' + test + b'\n')
+            status.bail_out.append(b'Bail Out! Test file does not exist' + test)
+            return status
+        try:
+            p.stdin.close()
+            for line in p.stdout:
+                log.write(line)
+                process_line(line, status, pending_output, log)
+        finally:
+            p.terminate()
+        status.exit = p.wait()
+        msg = b'# %s: exit %d\n' % (basename(test), status.exit)
+        log.write(msg)
+        show((msg,))
+    return status
+
+def summarize(status, logdir):
+    show(('# %s: %d failures, %d successes (%d unexpected)%s\n'
+          % (status.name, status.nok, status.ok, status.todo_ok,
+             ', Bailed Out!' if status.bail_out else ''),))
+    summary_path = status.log[:-4] + b'-summary.json'
+    data = {'bail_out': len(status.bail_out),  # bail_out binary?
+            'log': status.log,
+            'exit' : status.exit,
+            'expected' : status.expected,
+            'not_ok': status.nok,
+            'ok': status.ok,
+            'todo_ok': status.todo_ok}
+    with open(summary_path, 'wb') as summary:
+        json.dump(data, summary, indent=2, separators=(',', ': '))
+    return 2 if (status.nok or status.bail_out) else 0
+
+def run_tests(opt):
+    # FIXME: error handling, partial success cleanups, etc.
+    logdir = opt.d
+    for test in opt.tests:
+        status = run_test(test, logdir)
+        rc = summarize(status, logdir)
+        if rc:
+            return rc
+    return 0
+
+parser = ArgumentParser()
+parser.add_argument('-d', metavar='STATE_DIR')
+parser.add_argument('tests', metavar='TEST', nargs='*')
+opts = parser.parse_args()
+
+try:
+    exit(run_tests(opts))
+except KeyboardInterrupt:
+    exit(3)

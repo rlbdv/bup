@@ -1,3 +1,4 @@
+#!cmd/bup-python -mpytest
 
 from __future__ import absolute_import, print_function
 from binascii import unhexlify
@@ -9,8 +10,11 @@ from random import Random, randint
 from stat import S_IFDIR, S_IFLNK, S_IFREG, S_ISDIR, S_ISREG
 from sys import stderr
 from time import localtime, strftime, tzset
+import os, sys
 
-from wvtest import *
+sys.path[:0] = (os.getcwd() + '/t/mod',)
+
+from wvpytest import *
 
 from bup._helpers import write_random
 from bup import git, metadata, vfs
@@ -20,24 +24,22 @@ from bup.helpers import exc, shstr
 from bup.metadata import Metadata
 from bup.repo import LocalRepo
 from bup.test.vfs import tree_dict
-from buptest import ex, exo, no_lingering_errors, test_tempdir
+from buptest import ex, exo, no_lingering_errors
+import buptest
 
-top_dir = b'../../..'
-bup_tmp = os.path.realpath(b'../../../t/tmp')
-bup_path = top_dir + b'/bup'
+bup_tmp = os.path.realpath(b't/tmp')
+bup_path = b'./bup'
 start_dir = os.getcwd()
 
 def ex(cmd, **kwargs):
     print(shstr(cmd), file=stderr)
     return exc(cmd, **kwargs)
 
-@wvtest
 def test_default_modes():
     wvpasseq(S_IFREG | 0o644, vfs.default_file_mode)
     wvpasseq(S_IFDIR | 0o755, vfs.default_dir_mode)
     wvpasseq(S_IFLNK | 0o755, vfs.default_symlink_mode)
 
-@wvtest
 def test_cache_behavior():
     orig_max = vfs._cache_max_items
     try:
@@ -133,7 +135,6 @@ def run_augment_item_meta_tests(repo,
     wvpasseq(len(link_target), augmented.meta.size)
 
 
-@wvtest
 def test_item_mode():
     with no_lingering_errors():
         mode = S_IFDIR | 0o755
@@ -142,7 +143,6 @@ def test_item_mode():
         wvpasseq(mode, vfs.item_mode(vfs.Item(oid=oid, meta=mode)))
         wvpasseq(meta.mode, vfs.item_mode(vfs.Item(oid=oid, meta=meta)))
 
-@wvtest
 def test_reverse_suffix_duplicates():
     suffix = lambda x: tuple(vfs._reverse_suffix_duplicates(x))
     wvpasseq((b'x',), suffix((b'x',)))
@@ -154,10 +154,9 @@ def test_reverse_suffix_duplicates():
     wvpasseq((b'x', b'y-1', b'y-0'), suffix((b'x', b'y', b'y')))
     wvpasseq((b'x', b'y-1', b'y-0', b'z'), suffix((b'x', b'y', b'y', b'z')))
 
-@wvtest
 def test_misc():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tvfs-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tvfs-') as tmpdir:
             bup_dir = tmpdir + b'/bup'
             environ[b'GIT_DIR'] = bup_dir
             environ[b'BUP_DIR'] = bup_dir
@@ -265,14 +264,13 @@ def validate_vfs_seeking_read(repo, item, expected_path, read_sizes):
                 wvpasseq(b'', ex_buf)
                 wvpasseq(b'', act_buf)
 
-@wvtest
 def test_read_and_seek():
     # Write a set of randomly sized files containing random data whose
     # names are their sizes, and then verify that what we get back
     # from the vfs when seeking and reading with various block sizes
     # matches the original content.
     with no_lingering_errors():
-        with test_tempdir(b'bup-tvfs-read-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tvfs-read-') as tmpdir:
             resolve = vfs.resolve
             bup_dir = tmpdir + b'/bup'
             environ[b'GIT_DIR'] = bup_dir
@@ -311,10 +309,9 @@ def test_read_and_seek():
                                           b'%s/%d' % (data_path, size),
                                           read_sizes)
 
-@wvtest
 def test_contents_with_mismatched_bupm_git_ordering():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tvfs-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tvfs-') as tmpdir:
             bup_dir = tmpdir + b'/bup'
             environ[b'GIT_DIR'] = bup_dir
             environ[b'BUP_DIR'] = bup_dir
@@ -351,10 +348,9 @@ def test_contents_with_mismatched_bupm_git_ordering():
             name, item = next(((n, i) for n, i in contents if n == b'foo.'))
             wvpass(S_ISREG(item.meta.mode))
 
-@wvtest
 def test_duplicate_save_dates():
     with no_lingering_errors():
-        with test_tempdir(b'bup-tvfs-') as tmpdir:
+        with buptest.test_tempdir(b'bup-tvfs-') as tmpdir:
             bup_dir = tmpdir + b'/bup'
             environ[b'GIT_DIR'] = bup_dir
             environ[b'BUP_DIR'] = bup_dir
@@ -391,7 +387,6 @@ def test_duplicate_save_dates():
                       b'latest'),
                      tuple(sorted(x[0] for x in vfs.contents(repo, revlist))))
 
-@wvtest
 def test_item_read_write():
     with no_lingering_errors():
         x = vfs.Root(meta=13)

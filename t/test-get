@@ -14,15 +14,16 @@ from subprocess import PIPE
 import os, re, sys
 
 # For buptest, wvtest, ...
-sys.path[:0] = (abspath(os.path.dirname(__file__) + '/..'),)
+sys.path[:0] = (abspath(os.path.dirname(__file__) + '/mod'),
+                abspath(os.path.dirname(__file__) + '/..'))
 
 from bup import compat, path
 from bup.compat import environ, getcwd, items
 from bup.helpers import bquote, merge_dict, unlink
 from bup.io import byte_stream
 from buptest import ex, exo, test_tempdir
-from wvtest import wvcheck, wvfail, wvmsg, wvpass, wvpasseq, wvpassne, wvstart
-import bup.path
+from wvtap import wvcheck, wvfail, wvmsg, wvpass, wvpasseq, wvpassne, wvstart
+import bup
 
 sys.stdout.flush()
 stdout = byte_stream(sys.stdout)
@@ -967,7 +968,7 @@ if len(sys.argv) == 1:
              'unnamed')
 else:
     categories = sys.argv[1:]
-    
+
 with test_tempdir(b'get-') as tmpdir:
     chdir(tmpdir)
     try:
@@ -991,7 +992,8 @@ with test_tempdir(b'get-') as tmpdir:
                 elif category == 'unnamed':
                     test_unnamed(disposition, src_info)
                 else:
-                    raise Exception('unrecognized get test category')
+                    raise Exception('unrecognized get test category '
+                                    + repr(category))
     except Exception as ex:
         chdir(top)
         raise

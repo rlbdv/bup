@@ -13,6 +13,7 @@ py3 = py_maj >= 3
 
 if py3:
 
+    from io import StringIO
     from os import environb as environ
 
     lc_ctype = environ.get(b'LC_CTYPE')
@@ -46,6 +47,9 @@ if py3:
     def add_ex_ctx(ex, context_ex):
         """Do nothing (already handled by Python 3 infrastructure)."""
         return ex
+
+    def print_ex(ex, file=None):
+        return print_exception(type(ex), ex, ex.__traceback__, file=file)
 
     def items(x):
         return x.items()
@@ -81,6 +85,7 @@ else:  # Python 2
     def fsencode(x):
         return x
 
+    from cStringIO import StringIO
     from pipes import quote
     from os import environ, getcwd
 
@@ -111,7 +116,8 @@ else:  # Python 2
                 ex.__context__ = context_ex
         return ex
 
-    def dump_traceback(ex):
+    def dump_traceback(ex, file=None):
+        file = file or sys.stderr
         stack = [ex]
         next_ex = getattr(ex, '__context__', None)
         while next_ex:
@@ -120,12 +126,15 @@ else:  # Python 2
         stack = reversed(stack)
         ex = next(stack)
         tb = getattr(ex, '__traceback__', None)
-        print_exception(type(ex), ex, tb)
+        print_exception(type(ex), ex, tb, file=file)
         for ex in stack:
             print('\nDuring handling of the above exception, another exception occurred:\n',
-                  file=sys.stderr)
+                  file=file)
             tb = getattr(ex, '__traceback__', None)
-            print_exception(type(ex), ex, tb)
+            print_exception(type(ex), ex, tb, file=file)
+
+    def print_ex(ex, file=None):
+        return dump_traceback(ex, file=file)
 
     def items(x):
         return x.iteritems()
