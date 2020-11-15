@@ -1,11 +1,19 @@
 
+from __future__ import absolute_import
+from os.path import realpath
 from time import tzset
-import pytest, sys
+import os
+import pytest
+import sys
 
 sys.path[:0] = ['lib']
 
-from bup import helpers
 from bup.compat import environ
+
+# The "pwd -P" here may not be appropriate in the long run, but we
+# need it until we settle the relevant drecurse/exclusion questions:
+# https://groups.google.com/forum/#!topic/bup-list/9ke-Mbp10Q0
+os.chdir(realpath(os.getcwd()))
 
 @pytest.fixture(autouse=True)
 def ephemeral_env_changes():
