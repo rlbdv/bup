@@ -1,17 +1,21 @@
 
 from __future__ import absolute_import
-from os.path import basename, realpath
+from os.path import basename, dirname, realpath, relpath
 from time import tzset
 from traceback import extract_stack
+import errno
 import os
 import pytest
+import re
 import subprocess
 import sys
+import tempfile
 
 sys.path[:0] = ['lib']
 
 from bup import helpers
-from bup.compat import environ
+from bup.compat import environ, fsencode
+
 
 # The "pwd -P" here may not be appropriate in the long run, but we
 # need it until we settle the relevant drecurse/exclusion questions:
@@ -24,7 +28,7 @@ def pytest_runtest_makereport(item, call):
     other_hooks = yield
     report = other_hooks.get_result()
     bup = item.__dict__.setdefault('bup', {})
-    bup[report.when + '_report'] = report  # setup, call, teardown
+    bup[report.when + '-report'] = report  # setup, call, teardown
     item.bup = bup
 
 def bup_test_sort_order(item):
@@ -68,11 +72,29 @@ def ephemeral_env_changes():
             if k == b'TZ':
                 tzset()
 
+# Assumes (of course) this file is at the top-level of the source tree
+_bup_test_dir = realpath(dirname(fsencode(__file__))) + b'/test'
+_bup_tmp = _bup_test_dir + b'/tmp'
+try:
+    os.makedirs(_bup_tmp)
+except OSError as e:
+    if e.errno != errno.EEXIST:
+        raise
+
+_safe_path_rx = re.compile(br'[^a-zA-Z0-9_-]')
+
 @pytest.fixture()
-def tmpdir(tmp_path):
-    try:
-        yield bytes(tmp_path)
-    finally:
-        subprocess.call([b'chmod', b'-R', b'u+rwX', bytes(tmp_path)])
-        # FIXME: delete only if there are no errors
-        #subprocess.call(['rm', '-rf', tmpdir])
+def tmpdir(request):
+    rp = realpath(fsencode(request.fspath))
+    rp = relpath(rp, _bup_test_dir)
+    if request.function:
+        rp += b'-' + fsencode(request.function.__name__)
+    safe = _safe_path_rx.sub(b'-', rp)
+    tmpdir = tempfile.mkdtemp(dir=_bup_tmp, prefix=safe)
+    yield tmpdir
+    if request.node.bup['call-report'].failed:
+        print('\nPreserving:', b'test/' + relpath(tmpdir, _bup_test_dir),
+              file=sys.stderr)
+    else:
+        subprocess.call(['chmod', '-R', 'u+rwX', tmpdir])
+        subprocess.call(['rm', '-rf', tmpdir])
