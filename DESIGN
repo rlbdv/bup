@@ -18,8 +18,21 @@ source code to follow along and see what we're talking about.  bup's code is
 written primarily in python with a bit of C code in speed-sensitive places. 
 Here are the most important things to know:
 
- - bup (symlinked to main.py) is the main program that runs when you type
-   'bup'.
+ - The main program is a fairly small C program that mostly just
+   initializes the correct Python interpreter and then runs
+   bup.main.main().  This arrangement was chosen in order to give us
+   more flexibility.  For example:
+
+     - It allows us to avoid
+       [crashing on some Unicode-unfriendly command line arguments](https://bugs.python.org/issue35883)
+       which is critical, given that paths can be arbitrary byte
+       sequences.
+
+     - It allows more flexibility in dealing with upstream changes
+       like the recent breakage of our ability to manipulate the
+       processes arguement list on platforms that support it.
+
+ FIXME: finish reworking
  
  - cmd/bup-* (mostly symlinked to cmd/*-cmd.py) are the individual
    subcommands, in a way similar to how git breaks all its subcommands into

@@ -1,35 +1,5 @@
-#!/bin/sh
-"""": # -*-python-*-
-set -e
-# https://sourceware.org/bugzilla/show_bug.cgi?id=26034
-export "BUP_ARGV_0"="$0"
-arg_i=1
-for arg in "$@"; do
-    export "BUP_ARGV_${arg_i}"="$arg"
-    shift
-    arg_i=$((arg_i + 1))
-done
-# Here to end of preamble replaced during install
-# Find our directory
-top="$(pwd)"
-cmdpath="$0"
-# loop because macos doesn't have recursive readlink/realpath utils
-while test -L "$cmdpath"; do
-    link="$(readlink "$cmdpath")"
-    cd "$(dirname "$cmdpath")"
-    cmdpath="$link"
-done
-script_home="$(cd "$(dirname "$cmdpath")" && pwd -P)"
-cd "$top"
-exec "$script_home/../../config/bin/python" "$0"
-"""
-# end of bup preamble
 
 from __future__ import absolute_import, print_function
-
-import os, sys
-sys.path[:0] = [os.path.dirname(os.path.realpath(__file__)) + '/..']
-
 from importlib import import_module
 from pkgutil import iter_modules
 from subprocess import PIPE
@@ -422,5 +392,5 @@ def run_subcmd(module, args):
     else:
         run_subproc_cmd(args)
 
-
-wrap_main(lambda : run_subcmd(cmd_module, subcmd))
+def main():
+    wrap_main(lambda : run_subcmd(cmd_module, subcmd))

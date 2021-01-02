@@ -5,6 +5,8 @@ from binascii import hexlify
 from traceback import print_exception
 import os, sys
 
+import bup_main
+
 # Please see CODINGSTYLE for important exception handling guidelines
 # and the rationale behind add_ex_tb(), add_ex_ctx(), etc.
 
@@ -170,39 +172,11 @@ else:  # Python 2
     buffer = buffer
 
 
-argv = None
-argvb = None
-
-def _configure_argv():
-    global argv, argvb
-    assert not argv
-    assert not argvb
-    if len(sys.argv) > 1:
-        if environ.get(b'BUP_ARGV_0'):
-            print('error: BUP_ARGV* set and sys.argv not empty', file=sys.stderr)
-            sys.exit(2)
-        argv = sys.argv
-        argvb = [argv_bytes(x) for x in argv]
-        return
-    args = []
-    i = 0
-    arg = environ.get(b'BUP_ARGV_%d' % i)
-    while arg is not None:
-        args.append(arg)
-        i += 1
-        arg = environ.get(b'BUP_ARGV_%d' % i)
-    i -= 1
-    while i >= 0:
-        del environ[b'BUP_ARGV_%d' % i]
-        i -= 1
-    argvb = args
-    # System encoding?
-    if py3:
-        argv = [x.decode(errors='surrogateescape') for x in args]
-    else:
-        argv = argvb
-
-_configure_argv()
+argvb = bup_main.argv()
+if py3:
+    argv = [x.decode(errors='surrogateescape') for x in argvb]
+else:
+    argv = argvb
 
 
 def wrap_main(main):
