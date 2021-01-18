@@ -57,7 +57,8 @@ from bup.io import byte_stream, path_msg
 from bup.options import _tty_width
 
 def maybe_import_early(argv):
-    while (argv):
+    """Scan argv and import any modules specified by --import-py-module."""
+    while argv:
         if argv[0] != '--import-py-module':
             argv = argv[1:]
             continue
