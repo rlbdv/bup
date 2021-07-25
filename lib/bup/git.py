@@ -15,6 +15,7 @@ from bup.compat import (buffer,
                         byte_int, bytes_from_byte, bytes_from_uint,
                         environ,
                         items,
+                        pending_raise,
                         range,
                         reraise)
 from bup.io import path_msg
@@ -734,7 +735,12 @@ class PackWriter:
         return self
 
     def __exit__(self, type, value, traceback):
-        self.close()
+        if not value:
+            self.close()
+        else:
+            with pending_raise(value):
+                self.close()
+        return True
 
     def _open(self):
         if not self.file:

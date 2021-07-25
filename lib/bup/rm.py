@@ -110,22 +110,18 @@ def bup_rm(repo, paths, compression=6, verbosity=None):
         updated_refs[ref] = (branchitem.oid, None)
 
     if dead_saves:
-        writer = git.PackWriter(compression_level=compression)
-        try:
-            for branch, saves in compat.items(dead_saves):
-                assert(saves)
-                updated_refs[b'refs/heads/' + branch] = rm_saves(saves, writer)
-        except BaseException as ex:
-            if writer:
+        with git.PackWriter(compression_level=compression) as writer:
+            try:
+                for branch, saves in compat.items(dead_saves):
+                    assert(saves)
+                    updated_refs[b'refs/heads/' + branch] = rm_saves(saves, writer)
+            except BaseException as ex:
                 with pending_raise(ex):
                     writer.abort()
-        if writer:
-            # Must close before we can update the ref(s) below.
-            writer.close()
 
-    # Only update the refs here, at the very end, so that if something
-    # goes wrong above, the old refs will be undisturbed.  Make an attempt
-    # to update each ref.
+    # Only update the refs here, at the very end (writer must be
+    # closed), so that if something goes wrong above, the old refs
+    # will be undisturbed.  Make an attempt to update each ref.
     for ref_name, info in compat.items(updated_refs):
         orig_ref, new_ref = info
         try:

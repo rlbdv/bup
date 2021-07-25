@@ -27,6 +27,17 @@ class Nonlocal:
     pass
 
 
+class DummyContext:
+    def __init__(self):
+        pass
+    def __enter__(self):
+        return self
+    def __exit__(self, type, value, traceback):
+        if value:
+            raise value
+        return True
+
+
 sc_page_size = os.sysconf('SC_PAGE_SIZE')
 assert(sc_page_size > 0)
 
