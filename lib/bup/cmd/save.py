@@ -286,7 +286,7 @@ def save_tree(opt, reader, hlink_db, msr, w):
             root_collision = True
 
         # If switching to a new sub-tree, finish the current sub-tree.
-        while list(stack.namestack()) > [x[0] for x in dirp]:
+        while stack.path() > [x[0] for x in dirp]:
             _ = stack.pop(w)
 
         # If switching to a new sub-tree, start a new sub-tree.

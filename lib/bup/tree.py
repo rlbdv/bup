@@ -35,9 +35,8 @@ class Stack:
     def __len__(self):
         return len(self.stack)
 
-    def namestack(self):
-        for p in self.stack:
-            yield p.name
+    def path(self):
+        return [p.name for p in self.stack]
 
     def push(self, name, meta):
         self.stack.append(StackDir(name, meta))
@@ -47,21 +46,20 @@ class Stack:
         items = []
         for item in tree.items:
             if item.name in names_seen:
-                parent_path = b'/'.join(n for n in self.namestack()) + b'/'
+                parent_path = b'/'.join(n for n in self.path()) + b'/'
                 add_error('error: ignoring duplicate path %s in %s'
                           % (path_msg(item.name), path_msg(parent_path)))
             else:
                 names_seen.add(item.name)
                 items.append(item)
-        tree.items = items
+        return items
 
     def _write(self, w, tree):
-        self._clean(tree)
-
+        items = self._clean(tree)
         metalist = [(b'', tree.meta)]
         metalist += [(shalist_item_sort_key((entry.mode, entry.name, None)),
                       entry.meta)
-                     for entry in tree.items if entry.mode != GIT_MODE_TREE]
+                     for entry in items if entry.mode != GIT_MODE_TREE]
         metalist.sort(key = lambda x: x[0])
         metadata = BytesIO(b''.join(m[1].encode() for m in metalist))
         mode, oid = split_to_blob_or_tree(w.new_blob, w.new_tree,
@@ -71,7 +69,8 @@ class Stack:
         shalist += [(entry.gitmode,
                      mangle_name(entry.name, entry.mode, entry.gitmode),
                      entry.oid)
-                    for entry in tree.items]
+                    for entry in items]
+        tree.items = items
         return w.new_tree(shalist)
 
     def pop(self, w, override_tree=None, override_meta=None):
