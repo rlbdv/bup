@@ -362,22 +362,12 @@ static int HashSplitter_read(HashSplitter *self)
         if (!r)
             return -1;
 
-#if PY_MAJOR_VERSION < 3
-        /* stick to bytes since it's faster */
-        buf.buf = PyBytes_AsString(r);
-        if (!buf.buf) {
-            Py_DECREF(r);
-            return -1;
-        }
-        len = PyBytes_GET_SIZE(r);
-#else
         if (PyObject_GetBuffer(r, &buf, PyBUF_FULL_RO)) {
             Py_DECREF(r);
             return -1;
         }
 
         len = buf.len;
-#endif
 
         if (len > self->bufsz - self->end) {
             Py_DECREF(r);
@@ -387,16 +377,11 @@ static int HashSplitter_read(HashSplitter *self)
             return -1;
         }
 
-#if PY_MAJOR_VERSION < 3
-        if (len)
-            memcpy(PyBytes_AS_STRING(self->buf) + self->end, buf.buf, len);
-#else
         if (len)
             PyBuffer_ToContiguous(PyBytes_AS_STRING(self->buf) + self->end,
                                   &buf, len, 'C');
 
         PyBuffer_Release(&buf);
-#endif
 
         self->end += len;
         Py_DECREF(r);
@@ -470,9 +455,7 @@ static PyObject *HashSplitter_iternext(HashSplitter *self)
         const unsigned char *buf;
         int ofs, extrabits, maxlen, level;
         PyObject *ret;
-#if PY_MAJOR_VERSION >= 3
         PyObject *mview;
-#endif
 
         /* read some data if possible/needed */
         if (self->end < self->bufsz && self->fobj) {
@@ -526,18 +509,10 @@ static PyObject *HashSplitter_iternext(HashSplitter *self)
         }
 
         /* return the found chunk as a buffer view into the total */
-#if PY_MAJOR_VERSION < 3
-        // We stick to buffers in python 2 because they appear to be
-        // substantially smaller than memoryviews, and because
-        // zlib.compress() in python 2 can't accept a memoryview.
-        ret = PyBuffer_FromObject(self->buf, self->start, ofs);
-        self->start += ofs;
-#else
         mview = PyMemoryView_FromObject(self->buf);
         ret = PySequence_GetSlice(mview, self->start, self->start + ofs);
         Py_DECREF(mview);
         self->start += ofs;
-#endif
         return Py_BuildValue("Ni", ret, level);
     }
 }
