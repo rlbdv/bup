@@ -470,16 +470,20 @@ static PyObject *selftest(PyObject *self, PyObject *args)
 
 static PyObject *rollsum(PyObject *self, PyObject *args)
 {
-    unsigned int ret;
     Py_buffer buf;
-
     if (!PyArg_ParseTuple(args, "y*", &buf))
         return NULL;
-    assert(buf.len <= INT_MAX);
-    ret = rollsum_sum(buf.buf, 0, buf.len);
+
+    const uint32_t sum = rollsum_sum(buf.buf, 0, buf.len);
     PyBuffer_Release(&buf);
 
-    return Py_BuildValue("I", ret);
+    unsigned long py_sum;
+    if (!INT_ADD_OK(sum, 0, &py_sum))
+    {
+        PyErr_Format(PyExc_OverflowError, "rollsum won't fit in unsigned ");
+        return NULL;
+    }
+    return Py_BuildValue("k", py_sum);
 }
 
 
