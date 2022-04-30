@@ -470,16 +470,13 @@ static PyObject *selftest(PyObject *self, PyObject *args)
 
 static PyObject *rollsum(PyObject *self, PyObject *args)
 {
-    unsigned int ret;
     Py_buffer buf;
-
     if (!PyArg_ParseTuple(args, "y*", &buf))
         return NULL;
-    assert(buf.len <= INT_MAX);
-    ret = rollsum_sum(buf.buf, 0, buf.len);
-    PyBuffer_Release(&buf);
 
-    return Py_BuildValue("I", ret);
+    const unsigned long sum = rollsum_sum(buf.buf, 0, buf.len);
+    PyBuffer_Release(&buf);
+    return Py_BuildValue("k", sum);
 }
 
 
@@ -2300,6 +2297,9 @@ static int setup_module(PyObject *m)
     // At least for INTEGER_TO_PY
     assert(sizeof(intmax_t) <= sizeof(long long));
     assert(sizeof(uintmax_t) <= sizeof(unsigned long long));
+    // This should be guaranteed by the C standard, but it's cheap to
+    // double-check, and we depend on it.
+    assert(sizeof(unsigned long) >= sizeof(uint32_t));
 
     test_integral_assignment_fits();
 
