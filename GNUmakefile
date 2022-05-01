@@ -5,6 +5,9 @@ OUTPUT_OPTION = -MMD -MP -o $@
 SHELL := bash
 .DEFAULT_GOAL := all
 
+# Guard against accidentally using/testing a local bup
+export PATH := $(CURDIR)/dev/shadow-bin:$(PATH)
+
 clean_paths :=
 generated_dependencies :=
 
@@ -210,6 +213,7 @@ lint: dev/bup-exec dev/bup-python
 	./pylint
 
 test: all test/tmp dev/python lint
+	! bup version  # Ensure we can't test the local bup (cf. dev/shadow-bin)
 	./bup features
 	if test yes = "$$(dev/python -c 'import xdist; print("yes")' 2>/dev/null)"; then \
 	   (set -x; ./pytest $(xdist_opt);) \
