@@ -122,16 +122,49 @@ def parse_commit_gpgsig(sig):
 # FIXME: derived from http://git.rsbx.net/Documents/Git_Data_Formats.txt
 # Make sure that's authoritative.
 
-# See also
-# https://github.com/git/git/blob/master/Documentation/technical/signature-format.txt
-# The continuation lines have only one leading space.
-
 _start_end_char = br'[^ .,:;<>"\'\0\n]'
 _content_char = br'[^\0\n<>]'
 _safe_str_rx = br'(?:%s{1,2}|(?:%s%s*%s))' \
     % (_start_end_char,
        _start_end_char, _content_char, _start_end_char)
 _tz_rx = br'[-+]\d\d[0-5]\d'
+
+
+## Tags
+
+# Currently doesn't validate the tag name.
+_tag_rx = re.compile(br'''object (?P<object>[abcdefABCDEF0123456789]{40})
+type (?P<type>blob|tree|commit|tag)
+tag (?P<tag>.*)
+tagger (?P<tagger_name>%s) <(?P<tagger_mail>%s)> (?P<tagger_sec>\d+) (?P<tagger_tz>%s)
+(?P<data>(?:.|\n)*)''' % (_safe_str_rx, _safe_str_rx, _tz_rx))
+
+class TagInfo:
+    __slots__ = ('object', 'type', 'tag', 'data',
+                 'tagger_name', 'tagger_mail', 'tagger_sec', 'tagger_tz')
+
+def parse_tag(content):
+    m = re.match(_tag_rx, content)
+    if not m:
+        raise Exception('cannot parse tag %r' % content)
+    matches = m.groupdict()
+    tag = TagInfo()
+    tag.object = matches['object']
+    tag.type = matches['type']
+    tag.tag = matches['tag']
+    tag.tagger_name = matches['tagger_name']
+    tag.tagger_mail = matches['tagger_mail']
+    tag.tagger_sec = int(matches['tagger_sec'])
+    tag.tagger_tz = parse_tz_offset(matches['tagger_tz'])
+    return tag
+
+
+## Commits
+
+# See also
+# https://github.com/git/git/blob/master/Documentation/technical/signature-format.txt
+# The continuation lines have only one leading space.
+
 _parent_rx = br'(?:parent [abcdefABCDEF0123456789]{40}\n)'
 # Assumes every following line starting with a space is part of the
 # mergetag.  Is there a formal commit blob spec?
@@ -1440,8 +1473,11 @@ WalkItem = namedtuple('WalkItem', ['oid', 'type', 'mode',
 #   item.type = 'tree'
 #   ...
 
+def throw_missing_obj(oidx):
+    raise MissingObject(unhexlify(oidx))
 
-def walk_object(get_ref, oidx, stop_at=None, include_data=None):
+def walk_object(get_ref, oidx, stop_at=None, include_data=None,
+                for_missing=throw_missing_obj):
     """Yield everything reachable from oidx via get_ref (which must behave
     like CatPipe get) as a WalkItem, stopping whenever stop_at(oidx)
     returns true.  Throw MissingObject if a hash encountered is
@@ -1469,14 +1505,26 @@ def walk_object(get_ref, oidx, stop_at=None, include_data=None):
 
         item_it = get_ref(oidx)
         get_oidx, typ, _ = next(item_it)
+
         if not get_oidx:
-            raise MissingObject(unhexlify(oidx))
-        if typ not in (b'blob', b'commit', b'tree'):
+            for_missing(oidx, parent_path, chunk_path)
+            continue
+
+        if typ == b'blob':
+            if not mode:
+                mode = hashsplit.GIT_MODE_FILE
+        elif typ in (b'tree', b'commit'):
+            if not mode:
+                mode = hashsplit.GIT_MODE_TREE
+        elif typ == b'tag':
+            pass
+        else:
             raise Exception('unexpected repository object type %r' % typ)
 
         # FIXME: set the mode based on the type when the mode is None
         if typ == b'blob' and not include_data:
             # Dump data until we can ask cat_pipe not to fetch it
+            # FIXME: make it possible to avoid fetching the data
             for ignored in item_it:
                 pass
             data = None
@@ -1508,3 +1556,19 @@ def walk_object(get_ref, oidx, stop_at=None, include_data=None):
                         sub_chunk_path = chunk_path
                 pending.append((hexlify(ent_id), sub_path, sub_chunk_path,
                                 mode))
+        elif typ == b'tag':
+            # For now, tags are "transparent" like commits wrt the path.
+            tag = parse_tag(data)
+            if tag.type == b'blob':
+                pending.append((tag.object, parent_path, chunk_path,
+                                hashsplit.GIT_MODE_FILE))
+            elif tag.type in (b'tree' , b'commit'):
+                pending.append((tag.object, parent_path, chunk_path,
+                                hashsplit.GIT_MODE_TREE))
+            elif tag.type == b'tag':
+                pending.append((tag.object, parent_path, chunk_path, None))
+            else: # Should not be possible unless parse_tag() is broken.
+                # FIXME: check bytes vs string
+                raise Exception('tag %s points to unexpected type type: %s'
+                                % (oidx.encode('ascii'),
+                                   tag.type.encode('ascii')))
