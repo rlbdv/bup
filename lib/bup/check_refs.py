@@ -12,6 +12,7 @@ from bup.io import path_msg
 optspec = """
 bup check-refs [OPTION...] [REF_PATTERN...]
 --
+unrelated  specify when the refs are likely unrelated to save RAM
 commit-hash ...
 connectivity-only ...
 v,verbose   increase verbosity (can be used more than once)
@@ -128,6 +129,8 @@ def via_cmdline(args, *, out):
 
     visited = set()
     for ref, oid in ref_info:
+        if opt.unrelated:
+            visited = set()
         fsck_ref(ref, oid, visited,
                  commit_hash=opt.commit_hash,
                  connectivity_only=opt.connectivity_only,
