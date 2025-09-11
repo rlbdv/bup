@@ -37,10 +37,8 @@ def ex(*cmd):
 
 
 def setup_testfs():
+    # Try to set up testfs with user_xattr, etc.
     assert(sys.platform.startswith('linux'))
-    # Set up testfs with user_xattr, etc.
-    if subprocess.call([b'modprobe', b'loop']) != 0:
-        return False
     subprocess.call([b'umount', b'testfs'])
     ex(b'dd', b'if=/dev/zero', b'of=testfs.img', b'bs=1M', b'count=32')
     ex(b'mke2fs', b'-F', b'-j', b'-m', b'0', b'testfs.img')
@@ -272,7 +270,7 @@ if xattr:
             pytest.skip('skipping test -- not superuser')
             return
         if not setup_testfs():
-            pytest.skip('unable to load loop module; skipping dependent tests')
+            pytest.skip('unable to set up test fs; skipping dependent tests')
             return
         for f in glob.glob(b'testfs/*'):
             ex(b'rm', b'-rf', f)
