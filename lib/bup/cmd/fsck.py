@@ -1,9 +1,11 @@
 
+from errno import EMLINK, EOPNOTSUPP, EPERM, ERANGE, EREMOTEIO, EXDEV
 from os import SEEK_END
 from shutil import rmtree
 from subprocess import DEVNULL, PIPE, run
 from tempfile import mkdtemp
 from os.path import join
+from shutil import copy2
 import glob, os, sys
 
 from bup import options, git
@@ -81,7 +83,22 @@ def par2_generate(stem):
     # cf. https://github.com/Parchive/par2cmdline/issues/84
     with temp_dir(dir=parent, prefix=(base + b'-bup-tmp-')) as tmpdir:
         pack = base + b'.pack'
-        os.link(join(tmpdir, b'..', pack), join(tmpdir, pack))
+        pack_src = join(tmpdir, b'..', pack)
+        pack_dst = join(tmpdir, pack)
+        copy_instead = False
+        try:
+            os.link(pack_src, pack_dst)
+        except OSError as ex:
+            if ex.errno not in (EMLINK,
+                                EOPNOTSUPP, # freebsd
+                                EPERM, # linux
+                                ERANGE, # cryfs
+                                EREMOTEIO, # kafs (cross-directory)
+                                EXDEV): # openafs (cross-directory)
+                raise
+            copy_instead = True
+        if copy_instead:
+            copy2(pack_src, pack_dst)
         rc = par2(b'create', [b'-n1', b'-c200', b'--', base, pack],
                   verb_floor=2, cwd=tmpdir)
         if rc == 0:
