@@ -1493,7 +1493,7 @@ class MissingObject(KeyError):
 class WalkItem:
     oid: bytes
     name: bytes
-    type: Union['blob', 'commit', 'tree']
+    type: Union[b'blob', b'commit', b'tree']
     mode: int
     data: Optional[bytes]
 
